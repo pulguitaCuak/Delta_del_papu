@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Proyecto Delta</title>
+<style>
+:root{box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);
+--bg:#d8d8d2;--pn:#e8e8e3;--cv:#fbfbf8;--tx:#111;--mut:#666;--bd:#8d8d86;--gr:#e2e2dc;--gr2:#c9c9c0;--path:#1a4f9c;--hi:#c23b22;--carry:#2e7d32;--plan:#7b3fa0;color-scheme:light}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#1a1a1a;--pn:#252525;--cv:#161616;--tx:#ddd;--mut:#888;--bd:#555;--gr:#232323;--gr2:#363636;--path:#5aa0ff;--hi:#ff7a59;--carry:#69db7c;--plan:#c792ea;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#1a1a1a;--pn:#252525;--cv:#161616;--tx:#ddd;--mut:#888;--bd:#555;--gr:#232323;--gr2:#363636;--path:#5aa0ff;--hi:#ff7a59;--carry:#69db7c;--plan:#c792ea;color-scheme:dark}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--tx);font:13px/1.35 Consolas,"Courier New",monospace}
+.bar{padding:5px 10px;border-bottom:1px solid var(--bd);background:var(--pn);font-weight:bold}
+.bar span{font-weight:normal;color:var(--mut)}
+main{display:flex;gap:8px;padding:8px;align-items:flex-start;justify-content:center}
+.left{flex:none;min-width:0}
+.right{width:300px;flex:none;display:flex;flex-direction:column;gap:8px}
+@media (max-width:760px){main{flex-direction:column}.right{width:100%}.left{width:100%}}
+canvas{display:block;width:100%;aspect-ratio:1;background:var(--cv);border:1px solid var(--bd);cursor:crosshair}
+.status{border:1px solid var(--bd);border-top:0;background:var(--pn);padding:3px 6px;display:flex;justify-content:space-between;gap:8px;color:var(--mut);font-size:12px}
+fieldset{margin:0;border:1px solid var(--bd);background:var(--pn);padding:8px}
+legend{padding:0 4px}
+.row{display:flex;align-items:center;gap:6px;margin-bottom:5px}
+.row label{width:14px}
+.row input[type=range]{flex:1;min-width:0}
+input[type=number]{width:58px;font:inherit;background:var(--cv);color:var(--tx);border:1px solid var(--bd);padding:1px 3px}
+input[type=text]{flex:1;min-width:0;font:inherit;background:var(--cv);color:var(--tx);border:1px solid var(--bd);padding:1px 3px}
+select{flex:1;font:inherit;background:var(--cv);color:var(--tx);border:1px solid var(--bd);padding:1px 3px}
+button{font:inherit;background:var(--bg);color:var(--tx);border:1px solid var(--bd);padding:2px 8px;cursor:pointer}
+button:active{background:var(--gr2)}
+.b{display:flex;gap:4px;flex-wrap:wrap;margin-top:6px;align-items:center}
+.mut{color:var(--mut);margin-top:5px}
+#mp{width:66px;flex:none}
+#dg{display:grid;grid-template-columns:repeat(5,1fr);gap:3px}
+.dl{padding:2px 0;opacity:.45}
+.dl.on{opacity:1}
+.dl.mov{background:var(--carry);color:#fff;opacity:1}
+.dl.s{outline:2px solid var(--path);outline-offset:1px}
+#list{height:130px;overflow-y:auto;border:1px solid var(--bd);background:var(--cv)}
+.it{display:flex;gap:4px;align-items:center;padding:1px 4px;cursor:pointer;white-space:pre}
+.it:hover{background:var(--gr)}
+.it.sel{background:var(--path);color:#fff}
+.it span{flex:1}
+.it button{padding:0 4px;font-size:11px}
+textarea{width:100%;height:56px;font:11px Consolas,"Courier New",monospace;background:var(--cv);color:var(--tx);border:1px solid var(--bd);resize:vertical}
+.chk{display:block;margin-top:5px}
+</style>
+</head>
+<body>
+<div class="bar">DELTA <span>/ secuencias de movimiento del papu
+</span></div>
+<main>
+ <div class="left">
+  <canvas id="cv"></canvas>
+  <div class="status"><span id="pos">x - y -</span><span id="info"></span></div>
+ </div>
+ <div class="right">
+  <fieldset><legend>MQTT</legend>
+   <div class="row"><input type="text" id="mh" title="host de la Raspberry"><input type="number" id="mp" value="9001" title="puerto websockets"></div>
+   <div class="b"><button id="con">Conectar</button><span>deltas <input type="number" id="nn" min="1" max="99" value="20"></span></div>
+   <div class="mut" id="mqs">sin conexión</div>
+  </fieldset>
+  <fieldset><legend>Deltas</legend>
+   <div id="dg"></div>
+   <div class="mut" id="dst"></div>
+   <div class="b"><button id="send">Enviar</button><button id="sendall">Enviar a todos</button></div>
+  </fieldset>
+  <fieldset><legend id="lg">Posición</legend>
+   <div class="row"><label>X</label><input type="range" id="x" min="-150" max="150" value="0"><input type="number" id="xn" min="-150" max="150" value="0"></div>
+   <div class="row"><label>Y</label><input type="range" id="y" min="-150" max="150" value="0"><input type="number" id="yn" min="-150" max="150" value="0"></div>
+   <div class="row"><label>Z</label><input type="range" id="z" min="0" max="200" value="100"><input type="number" id="zn" min="0" max="200" value="100"></div>
+   <div class="row"><label style="width:auto">Acción</label><select id="act"><option value="mover">mover</option><option value="agarrar">agarrar</option><option value="soltar">soltar</option></select></div>
+   <div class="b"><button id="add">Agregar</button><button id="desel">Deseleccionar</button></div>
+   <label class="chk"><input type="checkbox" id="loop"> volver al punto 1</label>
+  </fieldset>
+  <fieldset><legend>Puntos</legend>
+   <div id="list"></div>
+   <div class="b"><button id="clear">Borrar todo</button></div>
+  </fieldset>
+  <fieldset><legend>JSON</legend>
+   <textarea id="json" spellcheck="false"></textarea>
+   <div class="b"><button id="copy">Copiar</button><button id="load">Cargar</button></div>
+  </fieldset>
+ </div>
+</main>
+<script src="mqtt.min.js" onerror="this.onerror=null;var s=document.createElement('script');s.src='https://cdn.jsdelivr.net/npm/mqtt@5.3.4/dist/mqtt.min.js';document.head.appendChild(s)"></script>
+<script>
+const R=150,$=id=>document.getElementById(id),AX=['x','y','z'];
+let N=20,did=1,sel=-1,cli=null;
+const D={};
+const dl=i=>D[i]||(D[i]={pts:[],loop:false,plan:[],now:-1,est:'',on:false});
+let S=dl(1);
+const cv=$('cv'),ctx=cv.getContext('2d');
+const cl=(v,a,b)=>Math.max(a,Math.min(b,v));
+const mq=t=>{$('mqs').textContent=t};
+const val=()=>({x:+$('x').value,y:+$('y').value,z:+$('z').value,a:$('act').value});
+function setVal(p){AX.forEach(a=>{$(a).value=$(a+'n').value=p[a]});$('act').value=p.a||'mover'}
+AX.forEach(a=>{
+ $(a).oninput=()=>{$(a+'n').value=$(a).value;change()};
+ $(a+'n').oninput=()=>{$(a).value=cl(+$(a+'n').value||0,+$(a).min,+$(a).max);change()};
+});
+function change(){if(sel>=0)S.pts[sel]=val();render()}
+function mouse(e){
+ const r=cv.getBoundingClientRect(),W=r.width;
+ return{x:cl(Math.round(((e.clientX-r.left)/W*2-1)*R),-R,R),y:cl(Math.round((1-(e.clientY-r.top)/W*2)*R),-R,R)};
+}
+cv.onmousemove=e=>{const m=mouse(e);$('pos').textContent='x '+m.x+'  y '+m.y};
+cv.onmouseleave=()=>$('pos').textContent='x -  y -';
+cv.onclick=e=>{const m=mouse(e);$('x').value=$('xn').value=m.x;$('y').value=$('yn').value=m.y;change()};
+$('act').onchange=change;
+$('add').onclick=()=>{S.pts.push(val());$('act').value='mover';render()};
+$('desel').onclick=()=>{sel=-1;render()};
+$('clear').onclick=()=>{S.pts=[];sel=-1;render()};
+$('loop').onchange=()=>{S.loop=$('loop').checked;render()};
+$('copy').onclick=()=>{try{navigator.clipboard.writeText($('json').value)}catch(e){$('json').select()}};
+$('load').onclick=()=>{
+ try{S.pts=JSON.parse($('json').value).map(p=>({x:cl(+p.x||0,-R,R),y:cl(+p.y||0,-R,R),z:cl(+p.z||0,0,200),a:['agarrar','soltar'].includes(p.a)?p.a:'mover'}));sel=-1;render()}
+ catch(e){alert('JSON mal formado')}
+};
+$('nn').onchange=()=>{
+ N=cl(Math.round(+$('nn').value)||1,1,99);$('nn').value=N;
+ if(did>N){did=1;S=dl(1);$('loop').checked=S.loop}
+ grid();render();
+};
+
+function grid(){
+ const g=$('dg');g.innerHTML='';
+ for(let i=1;i<=N;i++){const b=document.createElement('button');b.textContent=i;b.dataset.i=i;b.onclick=()=>pick(i);g.appendChild(b)}
+ paintGrid();
+}
+function paintGrid(){
+ [...$('dg').children].forEach(b=>{
+  const i=+b.dataset.i,d=dl(i);
+  b.className='dl'+(d.on?' on':'')+(d.est==='moviendo'?' mov':'')+(i===did?' s':'');
+ });
+}
+function pick(i){did=i;S=dl(i);sel=-1;$('loop').checked=S.loop;render()}
+function stat(){
+ $('dst').textContent='delta '+did+': '+(S.on?'online':'sin conexión')+(S.est?' · '+S.est+(S.now>=0?' (punto '+(S.now+1)+')':''):'')+(S.plan.length?' · plan '+S.plan.length+' pts':'');
+}
+
+const pad=(n,w)=>String(n).padStart(w,' ');
+function list(){
+ const l=$('list');l.innerHTML='';
+ S.pts.forEach((p,i)=>{
+  const d=document.createElement('div');d.className='it'+(i===sel?' sel':'');
+  d.innerHTML='<span>'+pad(i+1,2)+'  '+pad(p.x,4)+' '+pad(p.y,4)+' '+pad(p.z,4)+' '+({agarrar:'AGAR',soltar:'SOLT'}[p.a]||'MOV ')+'</span>';
+  [['^',()=>mv(i,-1)],['v',()=>mv(i,1)],['x',()=>del(i)]].forEach(([t,f])=>{
+   const b=document.createElement('button');b.textContent=t;b.onclick=e=>{e.stopPropagation();f()};d.appendChild(b);
+  });
+  d.onclick=()=>{sel=i;setVal(p);render()};
+  l.appendChild(d);
+ });
+}
+function mv(i,d){const j=i+d,a=S.pts;if(j<0||j>=a.length)return;[a[i],a[j]]=[a[j],a[i]];if(sel===i)sel=j;else if(sel===j)sel=i;render()}
+function del(i){S.pts.splice(i,1);if(sel===i)sel=-1;else if(sel>i)sel--;render()}
+
+function draw(){
+ const W=cv.clientWidth,cs=getComputedStyle(document.documentElement),g=n=>cs.getPropertyValue(n).trim();
+ const px=x=>(x+R)/(2*R)*W,py=y=>W-(y+R)/(2*R)*W;
+ ctx.clearRect(0,0,W,W);ctx.font='10px Consolas,monospace';ctx.lineWidth=1;
+ for(let v=-R;v<=R;v+=10){
+  ctx.strokeStyle=v%50===0?g('--gr2'):g('--gr');
+  ctx.beginPath();ctx.moveTo(px(v)+.5,0);ctx.lineTo(px(v)+.5,W);ctx.moveTo(0,py(v)+.5);ctx.lineTo(W,py(v)+.5);ctx.stroke();
+ }
+ ctx.strokeStyle=g('--mut');ctx.beginPath();ctx.moveTo(px(0)+.5,0);ctx.lineTo(px(0)+.5,W);ctx.moveTo(0,py(0)+.5);ctx.lineTo(W,py(0)+.5);ctx.stroke();
+ ctx.fillStyle=g('--mut');
+ for(let v=-R+50;v<R;v+=50)if(v){ctx.fillText(v,px(v)+2,py(0)+11);ctx.fillText(v,px(0)+3,py(v)-2)}
+ const q=S.pts.slice();if(S.loop&&q.length>2)q.push(q[0]);
+ let car=false;
+ for(let i=1;i<q.length;i++){
+  const a=q[i-1],b=q[i];
+  if(a.a==='agarrar')car=true;else if(a.a==='soltar')car=false;
+  ctx.strokeStyle=car?g('--carry'):g('--path');ctx.lineWidth=car?3:1.5;
+  ctx.beginPath();ctx.moveTo(px(a.x),py(a.y));ctx.lineTo(px(b.x),py(b.y));ctx.stroke();
+ }
+ if(S.plan.length){
+  ctx.setLineDash([6,4]);ctx.strokeStyle=g('--plan');ctx.lineWidth=1.5;ctx.beginPath();
+  S.plan.forEach((p,i)=>i?ctx.lineTo(px(p.x),py(p.y)):ctx.moveTo(px(p.x),py(p.y)));ctx.stroke();ctx.setLineDash([]);
+  S.plan.forEach(p=>{ctx.beginPath();ctx.arc(px(p.x),py(p.y),4,0,7);ctx.stroke()});
+ }
+ const c=val();
+ if(sel<0&&S.pts.length){
+  const l=S.pts[S.pts.length-1];ctx.setLineDash([3,4]);ctx.strokeStyle=g('--hi');ctx.lineWidth=1;
+  ctx.beginPath();ctx.moveTo(px(l.x),py(l.y));ctx.lineTo(px(c.x),py(c.y));ctx.stroke();ctx.setLineDash([]);
+ }
+ S.pts.forEach((p,i)=>{
+  const col=i===sel?g('--hi'):g('--path'),X=px(p.x),Y=py(p.y);
+  ctx.fillStyle=ctx.strokeStyle=col;ctx.lineWidth=1.5;
+  if(p.a==='agarrar'){ctx.beginPath();ctx.arc(X,Y,5,0,7);ctx.fill()}
+  else if(p.a==='soltar'){ctx.beginPath();ctx.arc(X,Y,5,0,7);ctx.fillStyle=g('--cv');ctx.fill();ctx.stroke()}
+  else ctx.fillRect(X-3,Y-3,7,7);
+  ctx.fillStyle=col;ctx.fillText((i+1)+' z'+p.z+(p.a==='agarrar'?' AGARRAR':p.a==='soltar'?' SOLTAR':''),X+7,Y-5);
+  if(i===S.now){ctx.strokeStyle=g('--carry');ctx.lineWidth=2;ctx.beginPath();ctx.arc(X,Y,10,0,7);ctx.stroke()}
+ });
+ if(sel<0){
+  ctx.strokeStyle=g('--hi');ctx.lineWidth=1;ctx.beginPath();
+  ctx.moveTo(px(c.x)-8,py(c.y));ctx.lineTo(px(c.x)+9,py(c.y));ctx.moveTo(px(c.x),py(c.y)-8);ctx.lineTo(px(c.x),py(c.y)+9);ctx.stroke();
+ }
+}
+
+function save(){
+ try{
+  const s={};for(const k in D)s[k]={pts:D[k].pts,loop:D[k].loop};
+  localStorage.setItem('delta',JSON.stringify({h:$('mh').value,p:$('mp').value,n:N,s}));
+ }catch(e){}
+}
+function restore(){
+ try{
+  const o=JSON.parse(localStorage.getItem('delta')||'null');if(!o)return;
+  if(o.h)$('mh').value=o.h;if(o.p)$('mp').value=o.p;
+  N=cl(+o.n||20,1,99);
+  for(const k in o.s){const d=dl(+k);d.pts=Array.isArray(o.s[k].pts)?o.s[k].pts:[];d.loop=!!o.s[k].loop}
+ }catch(e){}
+}
+
+function render(){
+ list();draw();paintGrid();stat();
+ const q=S.pts.slice();if(S.loop&&q.length>2)q.push(q[0]);
+ let L=0;for(let i=1;i<q.length;i++)L+=Math.hypot(q[i].x-q[i-1].x,q[i].y-q[i-1].y,q[i].z-q[i-1].z);
+ $('info').textContent='delta '+did+' | '+S.pts.length+' pts | '+L.toFixed(1)+' mm';
+ $('json').value=JSON.stringify(S.pts);
+ $('lg').textContent='Delta '+did+' · posición';
+ $('send').textContent='Enviar a '+did;
+ save();
+}
+
+function onMsg(t,m){
+ const p=t.split('/'),i=+p[1];
+ if(p[0]!=='delta'||!(i>=1&&i<=N))return;
+ const d=dl(i),s=m.toString();
+ if(p[2]==='online')d.on=s==='1';
+ else{
+  let j;try{j=JSON.parse(s)}catch(e){return}
+  if(p[2]==='plan'&&Array.isArray(j.puntos))d.plan=j.puntos;
+  else if(p[2]==='estado'){d.now=Number.isInteger(j.punto)?j.punto-1:-1;d.est=j.estado||''}
+ }
+ paintGrid();if(d===S){draw();stat()}
+}
+$('con').onclick=()=>{
+ if(cli){cli.end(true);cli=null;$('con').textContent='Conectar';mq('desconectado');return}
+ if(typeof mqtt==='undefined'){mq('falta la librería mqtt (mqtt.min.js)');return}
+ mq('conectando...');
+ cli=mqtt.connect('ws://'+$('mh').value+':'+$('mp').value,{reconnectPeriod:3000,connectTimeout:5000});
+ cli.on('connect',()=>{mq('conectado');$('con').textContent='Desconectar';cli.subscribe(['delta/+/plan','delta/+/estado','delta/+/online'])});
+ cli.on('close',()=>{mq('sin conexión');for(const k in D)D[k].on=false;paintGrid();stat()});
+ cli.on('error',e=>mq('error: '+e.message));
+ cli.on('message',onMsg);
+ save();
+};
+function ok(){
+ if(!cli||!cli.connected){mq('no hay conexión');return false}
+ if(!S.pts.length){mq('no hay puntos');return false}
+ return true;
+}
+const payload=d=>JSON.stringify({puntos:d.pts,lazo:d.loop});
+$('send').onclick=()=>{
+ if(!ok())return;
+ S.plan=[];S.now=-1;S.est='';
+ cli.publish('delta/'+did+'/secuencia',payload(S),{qos:1},e=>mq(e?'error al enviar':'enviado a delta '+did));
+ render();
+};
+$('sendall').onclick=()=>{
+ if(!ok())return;
+ for(let i=1;i<=N;i++){const d=dl(i);if(d!==S){d.pts=S.pts.map(p=>({...p}));d.loop=S.loop}d.plan=[];d.now=-1;d.est=''}
+ cli.publish('delta/todos/secuencia',payload(S),{qos:1},e=>mq(e?'error al enviar':'enviado a todos los deltas'));
+ render();
+};
+
+function resize(){
+ if(innerWidth>760){
+  const rh=document.querySelector('.right').offsetHeight-document.querySelector('.status').offsetHeight;
+  const side=Math.max(200,Math.min(rh,document.querySelector('main').clientWidth-324));
+  cv.style.width=cv.style.height=side+'px';
+ }else{cv.style.width='100%';cv.style.height='auto'}
+ const W=cv.clientWidth,d=devicePixelRatio||1;
+ cv.width=cv.height=Math.round(W*d);ctx.setTransform(d,0,0,d,0,0);draw();
+}
+$('mh').value=(location.protocol==='http:'&&location.hostname)||'raspberrypi.local';
+restore();
+$('nn').value=N;
+grid();
+if(location.protocol==='https:')mq('desde https no conecta a ws:// local: abrila desde la Raspberry o como archivo');
+addEventListener('resize',resize);
+render();resize();
+</script>
+</body>
+</html>

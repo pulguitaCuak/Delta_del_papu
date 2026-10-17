@@ -1,0 +1,6 @@
+[
+ {"id":"delta_tab","type":"tab","label":"Delta","disabled":false,"info":""},
+ {"id":"delta_broker","type":"mqtt-broker","name":"local","broker":"localhost","port":"1883","clientid":"","autoConnect":true,"usetls":false,"protocolVersion":"4","keepalive":"60","cleansession":true,"autoUnsubscribe":true,"birthTopic":"","birthQos":"0","birthPayload":"","closeTopic":"","closePayload":"","willTopic":"","willQos":"0","willPayload":""},
+ {"id":"delta_in","type":"mqtt in","z":"delta_tab","name":"delta/#","topic":"delta/#","qos":"1","datatype":"auto-detect","broker":"delta_broker","nl":false,"rap":true,"rh":0,"inputs":0,"x":120,"y":80,"wires":[["delta_dbg"]]},
+ {"id":"delta_dbg","type":"debug","z":"delta_tab","name":"delta","active":true,"tosidebar":true,"console":false,"tostatus":false,"complete":"true","targetType":"full","x":330,"y":80,"wires":[]}
+]
